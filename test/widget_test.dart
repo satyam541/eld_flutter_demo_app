@@ -1,30 +1,20 @@
-// This is a basic Flutter widget test.
+// Smoke test for the FleetTracker app.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Verifies the app boots, renders the map scaffold without throwing, and
+// shows the waiting overlay before any MQTT message has been received.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flutter_application_1/main.dart';
+import 'package:live_location_demo/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('FleetTrackerApp boots and shows the waiting overlay',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const FleetTrackerApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    // Let one frame settle (MQTT connect is fired post-frame; we don't await it).
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Before any location arrives, the waiting overlay should be visible.
+    expect(find.textContaining('Waiting'), findsOneWidget);
   });
 }

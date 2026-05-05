@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'providers/location_provider.dart';
-import 'screens/map_screen.dart';
+import 'providers/ble_provider.dart';
+import 'screens/home_screen.dart';
+
+// Override at build time:
+//   flutter build apk --release --dart-define=PORTAL_URL=https://other.example.com
+const String _portalUrl = String.fromEnvironment(
+  'PORTAL_URL',
+  defaultValue: 'https://eld-reboot.satyamsuri.com',
+);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Full-screen immersive experience
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ),
   );
-
   runApp(const FleetTrackerApp());
 }
 
@@ -24,9 +28,9 @@ class FleetTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => LocationProvider(),
+      create: (_) => BleProvider(portalUrl: _portalUrl),
       child: MaterialApp(
-        title: 'FleetTrack — Live Vehicle Tracker',
+        title: 'Pacific ELD — Driver',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           brightness: Brightness.dark,
@@ -37,10 +41,10 @@ class FleetTrackerApp extends StatelessWidget {
             surface: const Color(0xFF1E293B),
           ),
           useMaterial3: true,
-          fontFamily: 'sans-serif',
         ),
-        home: const MapScreen(),
+        home: const HomeScreen(),
       ),
     );
   }
 }
+

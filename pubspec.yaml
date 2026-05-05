@@ -1,4 +1,4 @@
-name: flutter_application_1
+name: live_location_demo
 description: "Live Vehicle Tracker - Real-time GPS via MQTT"
 publish_to: 'none'
 
@@ -15,14 +15,24 @@ dependencies:
   # Maps & real-time tracking
   google_maps_flutter: ^2.6.0
 
-  # MQTT client for receiving live GPS data from OBD-II dongle / PT30
-  mqtt_client: ^10.2.1
+  # BLE link to Geometris whereQube
+  flutter_blue_plus: ^1.32.12
+  permission_handler: ^11.3.1
+
+  # HTTP client for posting decoded packets to portal
+  http: ^1.2.2
+
+  # Realtime updates from portal back to driver app (optional)
+  pusher_channels_flutter: ^2.4.0
 
   # State management
   provider: ^6.1.2
 
   # Date/time formatting
   intl: ^0.19.0
+
+  # Persistent settings (driver login, portal URL, paired device)
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:

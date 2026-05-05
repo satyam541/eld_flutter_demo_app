@@ -8,7 +8,7 @@ plugins {
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 android {
-    namespace = "com.example.flutter_application_1"
+    namespace = "com.satyamsuri.eldreboot"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -24,9 +24,9 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.flutter_application_1"
-        // Minimum SDK 21 required by google_maps_flutter and mqtt_client (TLS)
-        minSdk = flutter.minSdkVersion
+        applicationId = "com.satyamsuri.eldreboot"
+        // BLE (flutter_blue_plus) needs API 21+; runtime perms cleanest at 23+.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

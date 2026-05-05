@@ -22,6 +22,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   late Animation<double> _pulseAnimation;
 
   bool _followVehicle = true;
+  bool _isProgrammaticMove = false;
   MapType _mapType = MapType.normal;
 
   static const CameraPosition _defaultPosition = CameraPosition(
@@ -60,9 +61,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Future<void> _animateCameraTo(VehicleLocation loc) async {
     if (!_followVehicle) return;
     final ctrl = await _mapController.future;
-    ctrl.animateCamera(
+    // Mark the upcoming camera move as programmatic so onCameraMoveStarted
+    // does not interpret it as the user panning the map.
+    _isProgrammaticMove = true;
+    await ctrl.animateCamera(
       CameraUpdate.newLatLng(LatLng(loc.lat, loc.lng)),
     );
+    // The animation is short (~300ms); clear the flag after a small grace
+    // window so any move-started callback fired during animation is ignored.
+    Future.delayed(const Duration(milliseconds: 600), () {
+      _isProgrammaticMove = false;
+    });
   }
 
   // ── Map elements ──────────────────────────────────────────────────────────
@@ -134,7 +143,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 compassEnabled: true,
                 onMapCreated: (ctrl) => _mapController.complete(ctrl),
                 onCameraMoveStarted: () {
-                  // Disable follow when user pans manually
+                  // Disable follow-mode only when the user pans manually.
+                  // Programmatic moves (vehicle-follow animation) set the
+                  // _isProgrammaticMove flag and must not toggle follow off.
+                  if (!_isProgrammaticMove && _followVehicle) {
+                    setState(() => _followVehicle = false);
+                  }
                 },
               ),
 
