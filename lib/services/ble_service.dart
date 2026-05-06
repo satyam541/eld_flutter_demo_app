@@ -71,11 +71,10 @@ class GeometrisBlePacket {
 
 class BleService {
   static const String namePrefix = 'WQ-';
-  static const Guid svcCsc = Guid('00001816-0000-1000-8000-00805f9b34fb');
-  static const Guid chrObdControl =
+  static final Guid svcCsc = Guid('00001816-0000-1000-8000-00805f9b34fb');
+  static final Guid chrObdControl =
       Guid('00002a57-0000-1000-8000-00805f9b34fb');
-  static const Guid chrObdData =
-      Guid('00002a5b-0000-1000-8000-00805f9b34fb');
+  static final Guid chrObdData = Guid('00002a5b-0000-1000-8000-00805f9b34fb');
 
   BluetoothDevice? _device;
   StreamSubscription<List<int>>? _notifySub;
@@ -86,7 +85,8 @@ class BleService {
   bool get connected => _device?.isConnected ?? false;
   String? get serialNumber => _serialNumber;
 
-  Future<List<ScanResult>> scan({Duration timeout = const Duration(seconds: 8)}) async {
+  Future<List<ScanResult>> scan(
+      {Duration timeout = const Duration(seconds: 8)}) async {
     final results = <ScanResult>[];
     final sub = FlutterBluePlus.scanResults.listen((r) {
       for (final s in r) {
