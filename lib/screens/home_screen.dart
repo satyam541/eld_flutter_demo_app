@@ -13,7 +13,7 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Pacific ELD — Driver')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -21,9 +21,7 @@ class HomeScreen extends StatelessWidget {
             Card(
               child: ListTile(
                 leading: Icon(
-                  ble.connected
-                      ? Icons.bluetooth_connected
-                      : Icons.bluetooth_disabled,
+                  ble.connected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
                   color: ble.connected ? Colors.green : Colors.grey,
                 ),
                 title: Text(ble.connected ? 'Connected' : 'Not connected'),
@@ -31,15 +29,39 @@ class HomeScreen extends StatelessWidget {
                 trailing: ElevatedButton(
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => const BlePairingScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const BlePairingScreen()),
                   ),
                   child: const Text('Pair'),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Upload status', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text('Packets received: ${ble.packetsReceived}'),
+                    Text('Posted to portal: ${ble.packetsPosted}'),
+                    Text('Failed: ${ble.packetsFailed}'),
+                    if (ble.lastApiError != null) ...[
+                      const SizedBox(height: 8),
+                      Text('Last error: ${ble.lastApiError}',
+                          style: const TextStyle(color: Colors.redAccent)),
+                    ],
+                    if (ble.seenTlvIds.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text('TLV IDs seen: ${(ble.seenTlvIds.toList()..sort()).join(", ")}',
+                          style: const TextStyle(fontSize: 12)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             if (pkt != null)
               Card(
                 child: Padding(
@@ -47,19 +69,27 @@ class HomeScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const Text('Last packet', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
                       Text('Serial: ${pkt.serialNumber}'),
                       Text('Reason: ${pkt.reasonText ?? "—"}'),
-                      Text(
-                        'Lat/Lon: ${pkt.latitude?.toStringAsFixed(5) ?? "—"}, ${pkt.longitude?.toStringAsFixed(5) ?? "—"}',
-                      ),
+                      Text('Lat/Lon: ${pkt.latitude?.toStringAsFixed(5) ?? "—"}, ${pkt.longitude?.toStringAsFixed(5) ?? "—"}'),
                       Text('Speed: ${pkt.speedMph?.toStringAsFixed(1) ?? "0"} mph'),
+                      Text('Heading: ${pkt.heading?.toStringAsFixed(0) ?? "—"}°'),
                       Text('Ignition: ${pkt.ignition == true ? "ON" : "OFF"}'),
+                      Text('RPM: ${pkt.rpm ?? "—"}'),
                       Text('VIN: ${pkt.vin ?? "—"}'),
+                      Text('Satellites: ${pkt.numSatellites ?? "—"}'),
+                      Text('Coolant: ${pkt.coolantTempC ?? "—"}°C'),
+                      Text('Fuel: ${pkt.fuelLevelPct?.toStringAsFixed(1) ?? "—"}%'),
+                      Text('Throttle: ${pkt.throttlePct?.toStringAsFixed(1) ?? "—"}%'),
+                      Text('Odometer: ${pkt.odometerMiles?.toStringAsFixed(1) ?? "—"} mi'),
+                      Text('DTC: ${pkt.dtc ?? "—"}'),
                     ],
                   ),
                 ),
               ),
-            const Spacer(),
+            const SizedBox(height: 16),
             Wrap(
               alignment: WrapAlignment.center,
               spacing: 12,

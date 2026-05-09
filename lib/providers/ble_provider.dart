@@ -19,12 +19,21 @@ class BleProvider extends ChangeNotifier {
   String _status = 'Idle';
   StreamSubscription<GeometrisBlePacket>? _packetSub;
 
+  int _packetsReceived = 0;
+  int _packetsPosted = 0;
+  int _packetsFailed = 0;
+
   List<ScanResult> get scanResults => List.unmodifiable(_scanResults);
   bool get scanning => _scanning;
   bool get connecting => _connecting;
   bool get connected => _connected;
   GeometrisBlePacket? get lastPacket => _last;
   String get status => _status;
+  int get packetsReceived => _packetsReceived;
+  int get packetsPosted => _packetsPosted;
+  int get packetsFailed => _packetsFailed;
+  String? get lastApiError => _api.lastError;
+  Set<int> get seenTlvIds => _ble.seenTlvIds;
 
   Future<void> scan() async {
     _scanning = true;
@@ -52,9 +61,15 @@ class BleProvider extends ChangeNotifier {
       _status = 'Connected';
       _packetSub = _ble.packets.listen((pkt) async {
         _last = pkt;
+        _packetsReceived++;
         notifyListeners();
-        // Fire-and-forget upload to portal.
-        unawaited(_api.postBlePacket(pkt));
+        final ok = await _api.postBlePacket(pkt);
+        if (ok) {
+          _packetsPosted++;
+        } else {
+          _packetsFailed++;
+        }
+        notifyListeners();
       });
     } catch (e) {
       _status = 'Connect failed: $e';

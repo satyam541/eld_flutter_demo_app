@@ -1,27 +1,11 @@
 /// BLE service for the Geometris whereQube ELD.
-///
-/// Protocol reference: docs/vendor/geometris-ble-protocol.md
-///
-/// Flow:
-///   1. Scan for a peripheral whose name starts with "WQ-" advertising
-///      service 0x1816 (Cycling Speed and Cadence — repurposed by the vendor).
-///   2. Connect, discover services.
-///   3. Discover the OBD service. Write [0x01, 0x02] to OBD_CONTROL
-///      to request the current data dictionary.
-///   4. Subscribe to OBD_DATA notifications. Each notification is a TLV
-///      frame: [item_id (1B), len (1B), value (len B)] repeated.
-///
-/// NOTE: The OBD_DATA UUID printed in the vendor PDF is missing one hex
-/// character ("0002a5b…" → likely "00002a5b-…"). We try the canonical
-/// 128-bit form first, then fall back to a tolerant scan that subscribes
-/// to every characteristic with NOTIFY support on the OBD service.
-
 library;
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class GeometrisBlePacket {
@@ -35,6 +19,13 @@ class GeometrisBlePacket {
   final double? odometerMiles;
   final int? rpm;
   final String? vin;
+  final int? numSatellites;
+  final int? coolantTempC;
+  final double? fuelLevelPct;
+  final double? throttlePct;
+  final int? ignitionOnSec;
+  final int? totalIdleSec;
+  final String? dtc;
   final Map<int, dynamic> raw;
   final String? reasonText;
 
@@ -49,6 +40,13 @@ class GeometrisBlePacket {
     this.odometerMiles,
     this.rpm,
     this.vin,
+    this.numSatellites,
+    this.coolantTempC,
+    this.fuelLevelPct,
+    this.throttlePct,
+    this.ignitionOnSec,
+    this.totalIdleSec,
+    this.dtc,
     this.reasonText,
     required this.raw,
   });
@@ -64,6 +62,13 @@ class GeometrisBlePacket {
         'odometerMiles': odometerMiles,
         'rpm': rpm,
         'vin': vin,
+        'numSatellites': numSatellites,
+        'coolantTempC': coolantTempC,
+        'fuelLevelPct': fuelLevelPct,
+        'throttlePct': throttlePct,
+        'ignitionOnSec': ignitionOnSec,
+        'totalIdleSec': totalIdleSec,
+        'dtc': dtc,
         'reasonText': reasonText,
         'raw': raw.map((k, v) => MapEntry(k.toString(), v)),
       };
@@ -80,10 +85,13 @@ class BleService {
   StreamSubscription<List<int>>? _notifySub;
   final _packetController = StreamController<GeometrisBlePacket>.broadcast();
   String? _serialNumber;
+  int? _lastTs;
+  final Set<int> _seenTlvIds = <int>{};
 
   Stream<GeometrisBlePacket> get packets => _packetController.stream;
   bool get connected => _device?.isConnected ?? false;
   String? get serialNumber => _serialNumber;
+  Set<int> get seenTlvIds => Set.unmodifiable(_seenTlvIds);
 
   Future<List<ScanResult>> scan(
       {Duration timeout = const Duration(seconds: 8)}) async {
@@ -116,7 +124,6 @@ class BleService {
         if (c.uuid == chrObdData) data = c;
       }
     }
-    // Fallback: pick first NOTIFY characteristic on the CSC service.
     if (data == null) {
       for (final svc in services.where((s) => s.uuid == svcCsc)) {
         for (final c in svc.characteristics) {
@@ -136,13 +143,10 @@ class BleService {
     await data.setNotifyValue(true);
     _notifySub = data.lastValueStream.listen(_onNotify);
 
-    // Request data dictionary if control characteristic exists.
     if (control != null && control.properties.write) {
       try {
         await control.write([0x01, 0x02], withoutResponse: false);
-      } catch (_) {
-        // Some firmware revisions reject the cmd silently — non-fatal.
-      }
+      } catch (_) {}
     }
   }
 
@@ -161,56 +165,48 @@ class BleService {
     await _packetController.close();
   }
 
-  // ── Decoding ────────────────────────────────────────────────────────────
-
   void _onNotify(List<int> bytes) {
     if (bytes.isEmpty) return;
     final tlv = _decodeTlv(Uint8List.fromList(bytes));
     if (tlv.isEmpty) return;
 
-    double? lat, lon, speed, heading, odo;
-    int? ts, rpm;
+    _seenTlvIds.addAll(tlv.keys);
+    if (kDebugMode) {
+      debugPrint('[BLE] frame TLV IDs: ${tlv.keys.toList()..sort()}');
+    }
+
+    double? lat, lon, speed, heading, odo, fuel, throttle;
+    int? ts, rpm, sats, coolant, ignOn, idleTotal;
     bool? ignition;
-    String? vin, reason;
+    String? vin, reason, dtc;
 
     tlv.forEach((id, value) {
       switch (id) {
-        case 3:
-          lat = _bytesToDouble(value);
-          break;
-        case 4:
-          lon = _bytesToDouble(value);
-          break;
-        case 9:
-          reason = utf8.decode(value, allowMalformed: true).trim();
-          break;
-        case 11:
-          ignition = value.isNotEmpty && value[0] != 0;
-          break;
-        case 14:
-          speed = _bytesToDouble(value);
-          break;
-        case 17:
-          heading = _bytesToDouble(value);
-          break;
-        case 24:
-          odo = _bytesToDouble(value);
-          break;
-        case 36:
-          ts = _bytesToInt(value);
-          break;
-        case 70:
-          rpm = _bytesToInt(value);
-          break;
-        case 74:
-          vin = utf8.decode(value, allowMalformed: true).trim();
-          break;
+        case 3:  lat = _bytesToDouble(value); break;
+        case 4:  lon = _bytesToDouble(value); break;
+        case 9:  reason = utf8.decode(value, allowMalformed: true).trim(); break;
+        case 11: ignition = value.isNotEmpty && value[0] != 0; break;
+        case 14: speed = _bytesToDouble(value); break;
+        case 17: heading = _bytesToDouble(value); break;
+        case 19: sats = _bytesToInt(value); break;
+        case 24: odo = _bytesToDouble(value); break;
+        case 36: ts = _bytesToInt(value); break;
+        case 49: ignOn = _bytesToInt(value); break;
+        case 50: idleTotal = _bytesToInt(value); break;
+        case 70: rpm = _bytesToInt(value); break;
+        case 71: coolant = _bytesToInt(value); break;
+        case 74: vin = utf8.decode(value, allowMalformed: true).trim(); break;
+        case 75: fuel = _bytesToDouble(value); break;
+        case 76: dtc = utf8.decode(value, allowMalformed: true).trim(); break;
+        case 77: throttle = _bytesToDouble(value); break;
       }
     });
 
-    if (ts == null) {
-      // Some frames are partial; drop until we have a timestamp.
-      return;
+    // FIX: don't drop frames missing timestamp — use last-known or device clock
+    if (ts != null) {
+      _lastTs = ts;
+    } else {
+      ts = _lastTs ?? (DateTime.now().millisecondsSinceEpoch ~/ 1000);
     }
 
     _packetController.add(
@@ -225,6 +221,13 @@ class BleService {
         odometerMiles: odo,
         rpm: rpm,
         vin: vin,
+        numSatellites: sats,
+        coolantTempC: coolant,
+        fuelLevelPct: fuel,
+        throttlePct: throttle,
+        ignitionOnSec: ignOn,
+        totalIdleSec: idleTotal,
+        dtc: dtc,
         reasonText: reason,
         raw: tlv.map((k, v) => MapEntry(k, v.toList())),
       ),
@@ -245,12 +248,8 @@ class BleService {
   }
 
   double? _bytesToDouble(Uint8List v) {
-    if (v.length == 4) {
-      return ByteData.sublistView(v).getFloat32(0, Endian.little);
-    }
-    if (v.length == 8) {
-      return ByteData.sublistView(v).getFloat64(0, Endian.little);
-    }
+    if (v.length == 4) return ByteData.sublistView(v).getFloat32(0, Endian.little);
+    if (v.length == 8) return ByteData.sublistView(v).getFloat64(0, Endian.little);
     final i = _bytesToInt(v);
     return i?.toDouble();
   }
@@ -265,7 +264,6 @@ class BleService {
   }
 
   String? _serialFromName(String name) {
-    // "WQ-88X150380033" → "88X150380033"
     if (!name.startsWith(namePrefix)) return null;
     return name.substring(namePrefix.length);
   }
