@@ -25,6 +25,9 @@ dependencies:
   # Realtime updates from portal back to driver app (optional)
   pusher_channels_flutter: ^2.4.0
 
+  # MQTT client for HiveMQ Cloud realtime location
+  mqtt_client: ^10.2.1
+
   # State management
   provider: ^6.1.2
 

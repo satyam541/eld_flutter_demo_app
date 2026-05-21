@@ -12,19 +12,22 @@ class ApiClient {
 
   Future<bool> postBlePacket(GeometrisBlePacket pkt) async {
     final uri = Uri.parse('$portalUrl/api/ingest/ble');
+    final bodyJson = jsonEncode(pkt.toJson());
+    debugPrint('[API] → POST $uri');
+    debugPrint('[API] → body: $bodyJson');
     try {
       final resp = await http
           .post(
             uri,
             headers: {'content-type': 'application/json'},
-            body: jsonEncode(pkt.toJson()),
+            body: bodyJson,
           )
           .timeout(const Duration(seconds: 8));
       lastStatusCode = resp.statusCode;
+      debugPrint('[API] ← ${resp.statusCode} ${resp.body}');
       final ok = resp.statusCode >= 200 && resp.statusCode < 300;
       if (!ok) {
         lastError = 'HTTP ${resp.statusCode}: ${resp.body}';
-        if (kDebugMode) debugPrint('[API] $lastError');
       } else {
         lastError = null;
       }
@@ -32,7 +35,7 @@ class ApiClient {
     } catch (e) {
       lastError = e.toString();
       lastStatusCode = null;
-      if (kDebugMode) debugPrint('[API] post failed: $e');
+      debugPrint('[API] post failed: $e');
       return false;
     }
   }
