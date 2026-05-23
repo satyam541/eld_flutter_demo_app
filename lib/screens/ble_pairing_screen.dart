@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +20,10 @@ class _BlePairingScreenState extends State<BlePairingScreen> {
   }
 
   Future<void> _ensurePermissions() async {
+    // On web there are no runtime BLE permissions — the browser's device
+    // chooser handles consent. permission_handler throws "Unsupported
+    // operation" for bluetoothScan on web, so skip it.
+    if (kIsWeb) return;
     await [
       Permission.bluetoothScan,
       Permission.bluetoothConnect,

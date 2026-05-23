@@ -104,7 +104,13 @@ class BleService {
         }
       }
     });
-    await FlutterBluePlus.startScan(timeout: timeout);
+    // On web, the browser only allows GATT access to services declared up
+    // front. Without this, discoverServices() throws a SecurityError:
+    // "Origin is not allowed to access any service".
+    await FlutterBluePlus.startScan(
+      timeout: timeout,
+      webOptionalServices: [svcCsc],
+    );
     await FlutterBluePlus.isScanning.where((s) => s == false).first;
     await sub.cancel();
     return results;
@@ -113,8 +119,20 @@ class BleService {
   Future<void> connect(BluetoothDevice device) async {
     _device = device;
     _serialNumber = _serialFromName(device.platformName);
+    debugPrint('[BLE] connecting to ${device.platformName} (${device.remoteId})...');
     await device.connect(timeout: const Duration(seconds: 12));
+    debugPrint('[BLE] connected, discovering services...');
     final services = await device.discoverServices();
+    debugPrint('[BLE] discovered ${services.length} service(s):');
+    for (final svc in services) {
+      debugPrint('[BLE]   service ${svc.uuid}');
+      for (final c in svc.characteristics) {
+        final p = c.properties;
+        debugPrint('[BLE]     char ${c.uuid} '
+            'notify=${p.notify} indicate=${p.indicate} '
+            'write=${p.write} writeNR=${p.writeWithoutResponse} read=${p.read}');
+      }
+    }
 
     BluetoothCharacteristic? control;
     BluetoothCharacteristic? data;
@@ -139,14 +157,40 @@ class BleService {
         'OBD_DATA characteristic not found on ${device.platformName}',
       );
     }
+    debugPrint('[BLE] selected data char ${data.uuid} '
+        '(notify=${data.properties.notify} indicate=${data.properties.indicate}); '
+        'control char ${control?.uuid}');
 
-    await data.setNotifyValue(true);
+    // Enable notifications. NOTE: on web, flutter_blue_plus_web's
+    // setNotifyValue successfully calls Chrome's startNotifications() (the
+    // subscription goes live) but never emits the onDescriptorWritten/CCCD
+    // event that the package's Dart layer waits for, so setNotifyValue always
+    // throws a timeout even though notifications ARE active. We therefore treat
+    // a timeout on web as success. On native we let the error propagate.
+    debugPrint('[BLE] enabling notifications on ${data.uuid}...');
+    try {
+      await data.setNotifyValue(true);
+      debugPrint('[BLE] notifications enabled');
+    } catch (e) {
+      if (kIsWeb) {
+        debugPrint('[BLE] setNotifyValue timed out on web; subscription is '
+            'active, proceeding: $e');
+      } else {
+        rethrow;
+      }
+    }
     _notifySub = data.lastValueStream.listen(_onNotify);
 
+    // Start the OBD data stream. On Android this runs after notifications are
+    // enabled; on web we reach here once startNotifications() has succeeded.
     if (control != null && control.properties.write) {
+      debugPrint('[BLE] writing control [0x01,0x02] to ${control.uuid}...');
       try {
         await control.write([0x01, 0x02], withoutResponse: false);
-      } catch (_) {}
+        debugPrint('[BLE] control write ok');
+      } catch (e) {
+        debugPrint('[BLE] control write failed: $e');
+      }
     }
   }
 
