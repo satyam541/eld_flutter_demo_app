@@ -70,10 +70,18 @@ class _BlePairingScreenState extends State<BlePairingScreen> {
                           height: 22,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : ElevatedButton(
-                          onPressed: () => ble.connect(r.device),
-                          child: const Text('Connect'),
-                        ),
+                      : (ble.connected && ble.connectedDevice?.remoteId == r.device.remoteId)
+                          ? const Text(
+                              'Connected',
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : ElevatedButton(
+                              onPressed: () => ble.connect(r.device),
+                              child: const Text('Connect'),
+                            ),
                 );
               },
             ),

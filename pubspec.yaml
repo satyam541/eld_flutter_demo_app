@@ -14,6 +14,7 @@ dependencies:
 
   # Maps & real-time tracking
   google_maps_flutter: ^2.6.0
+  url_launcher: ^6.3.0
 
   # BLE link to Geometris whereQube
   flutter_blue_plus: ^1.32.12
